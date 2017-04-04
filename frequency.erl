@@ -7,7 +7,7 @@
 %%   (c) Francesco Cesarini and Simon Thompson
 
 -module(frequency).
--export([init/0,start/0]).
+-export([init/0,start/0,stop/0,allocate/1,deallocate/2]).
 -include_lib("eunit/include/eunit.hrl").
 
 %% These are the start functions used to create and
@@ -29,7 +29,7 @@ loop(Frequencies) ->
       Pid ! {reply, Reply},
       loop(NewFrequencies);
     {request, Pid , {deallocate, Freq}} ->
-      {NewFrequencies,Reply} = deallocate(Frequencies,Freq,Pid),
+      {NewFrequencies,Reply} = deallocate(Frequencies,Pid,Freq),
       Pid ! {reply,Reply},
       loop(NewFrequencies);
     {request, Pid, stop} ->
@@ -41,10 +41,10 @@ loop(Frequencies) ->
 
 allocate_test() ->
     [
-     ?assertEqual(allocate_twice(1),{{[11],[{10,1}]},{error,multiple_frequencies}})
+     ?assertEqual(test_allocate_twice(1),{{[11],[{10,1}]},{error,multiple_frequencies}})
     ].
 
-allocate_twice(Pid) ->
+test_allocate_twice(Pid) ->
     InitialState={[10,11],[]},
     {NewState,_}=allocate(InitialState,Pid),
     allocate(NewState,Pid).
@@ -62,15 +62,15 @@ allocate(State={[Freq|Free], Allocated}, Pid) ->
 deallocate_test() ->
     [
      ?assertEqual(deallocate({[10,11],[]},10,1),{{[10,11],[]},{error,frequency_unused}}),
-     ?assertEqual(deallocate_unused(1),{{[11],[{10,1}]},{error,frequency_unused}})
+     ?assertEqual(test_deallocate_unused(1),{{[11],[{10,1}]},{error,frequency_unused}})
     ].
 
-deallocate_unused(Pid) ->
+test_deallocate_unused(Pid) ->
     InitialState={[10,11],[]},
     {NewState,_}=allocate(InitialState,Pid),
-    deallocate(NewState,11,Pid).
+    deallocate(NewState,Pid,11).
 
-deallocate(State={Free,Allocated},Freq,Pid) ->
+deallocate(State={Free,Allocated},Pid,Freq) ->
     case lists:keyfind(Freq,1,Allocated) of
         false ->
             {State,{error,frequency_unused}};
@@ -83,3 +83,13 @@ deallocate(State={Free,Allocated},Freq,Pid) ->
 
 start() ->
     register(frequency,spawn(frequency,init,[])).
+
+stop() ->
+    self() ! {request,self(),stop},
+    unregister(frequency).
+
+allocate(Pid) ->
+    frequency ! {request,Pid,allocate}.
+
+deallocate(Pid,Freq) ->
+    frequency ! {request,Pid,{deallocate,Freq}}.
