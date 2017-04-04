@@ -7,18 +7,19 @@
 %%   (c) Francesco Cesarini and Simon Thompson
 
 -module(frequency).
--export([init/0,start/0,stop/0,allocate/1,deallocate/2]).
+-export([init/1,start/0,start_debug/1,stop/0,allocate/1,deallocate/2]).
 -include_lib("eunit/include/eunit.hrl").
 
 %% These are the start functions used to create and
 %% initialize the server.
 
-init() ->
-  Frequencies = {get_frequencies(), []},
-  loop(Frequencies).
+init(TestLatencyMs) ->
+  Frequencies={get_frequencies(),[]},
+  loop({Frequencies,erlang:system_time(millisecond)},TestLatencyMs).
 
 % Hard Coded
-get_frequencies() -> [10,11,12,13,14,15].
+get_frequencies() ->
+    [10,11,12,13,14,15].
 
 %% The Main Loop
 
@@ -28,25 +29,38 @@ get_frequencies() -> [10,11,12,13,14,15].
     %% ].
 
 
-loop(Frequencies) ->
-  receive
-      {request,Pid,Req,timeout_ms} ->
-          case request_timed_out(timeout_ms) of
-              false ->
-                  NewFrequencies=process_request(Frequencies,{request,Pid,Req}),
-                  loop(NewFrequencies);
-              true ->
-                  loop(Frequencies)
-          end;
-      {request, Pid, stop} ->
-          Pid ! {reply,self(),stopped}
-  after 500 ->
-          clear(),
-          loop(Frequencies)
-  end.
+loop(State,TestLatencyMs) ->
+    {Frequencies,LastClearTimestampMs}=State,
+    timer:sleep(TestLatencyMs),
+    receive
+        {request,Pid,Req,{timeout,TimeoutMs}} ->
+            case request_timed_out(TimeoutMs) of
+                false ->
+                    NewFrequencies=process_request(Frequencies,{request,Pid,Req}),
+                    ClearTimestampMs=consider_clear(LastClearTimestampMs),
+                    loop({NewFrequencies,ClearTimestampMs},TestLatencyMs);
+                true ->
+                    ClearTimestampMs=consider_clear(LastClearTimestampMs),
+                    loop({Frequencies,ClearTimestampMs},TestLatencyMs)
+            end;
+        {request, Pid, stop} ->
+            Pid ! {reply,self(),stopped}
+    after 2000 ->
+            clear(),
+            loop({Frequencies,erlang:system_time(millisecond)},TestLatencyMs)
+    end.
 
-request_timed_out(timeout_ms) ->
-    erlang:system_time(millis) >= timeout_ms.
+consider_clear(LastClearTimestampMs) ->
+    case (LastClearTimestampMs + 2000) >= erlang:system_time(millisecond) of
+        true ->
+            clear(),
+            erlang:system_time(millisecond);
+        false ->
+            LastClearTimestampMs
+    end.
+
+request_timed_out(TimeoutMs) ->
+    erlang:system_time(millisecond) >= TimeoutMs.
 
 process_request(Frequencies,{request,Pid,allocate}) ->
     {NewFrequencies, Reply} = allocate(Frequencies, Pid),
@@ -60,7 +74,7 @@ process_request(Frequencies,{request,Pid,{deallocate, Freq}}) ->
 clear() ->
     receive
         Msg ->
-            io:format("Clearing msg: ~s~n",[Msg]),
+            io:format("Clearing msg: ~w~n",[Msg]),
             clear()
     after 0 ->
             clear_ok
@@ -112,14 +126,17 @@ deallocate(State={Free,Allocated},Pid,Freq) ->
     end.
 
 start() ->
-    register(frequency,spawn(frequency,init,[])).
+    register(frequency,spawn(frequency,init,[0])).
+
+start_debug(TestLatencyMs) ->
+    register(frequency,spawn(frequency,init,[TestLatencyMs])).
 
 stop() ->
-    self() ! {request,self(),stop},
+    frequency ! {request,self(),stop},
     unregister(frequency).
 
 allocate(Pid) ->
-    frequency ! {request,Pid,allocate,{timeout,erlang:system_time(millis)+500}}.
+    frequency ! {request,Pid,allocate,{timeout,erlang:system_time(millisecond)+500}}.
 
 deallocate(Pid,Freq) ->
-    frequency ! {request,Pid,{deallocate,Freq},{timeout,erlang:system_time(millis)+500}}.
+    frequency ! {request,Pid,{deallocate,Freq},{timeout,erlang:system_time(millisecond)+500}}.
