@@ -1,5 +1,5 @@
 -module(week1).
--export([server/1,client/2,reverse_proxy/2]).
+-export([server/1,client/2,reverse_proxy/2,receiver1/0,receiver2/0,sorted_receiver/1]).
 
 
 -spec palindrome(string()) -> boolean().
@@ -73,3 +73,41 @@ reverse_proxy(Owner,Servers) ->
 pick_server(Servers) ->
     Index=random:uniform(length(Servers)),
     lists:nth(Index,Servers).
+
+
+%% 1.8
+receiver1() ->
+    receive
+        stop ->
+            %% timer:sleep(1000),
+            io:format("message:~s~n",[stop]);
+        Msg ->
+            %% timer:sleep(1000),
+            io:format("message:~s~n",[Msg]),
+            receiver1()
+    end.
+
+receiver2() ->
+    receive
+        Msg ->
+            %% timer:sleep(1000),
+            case Msg of
+                stop ->
+                    io:format("message:~s~n",[Msg]);
+                _ ->
+                    io:format("message:~s~n",[Msg]),
+                    receiver2()
+            end
+    end.
+
+sorted_receiver(State) ->
+    receive
+        {second,Str2} when State==first ->
+            io:format("message2:~s~n",[Str2]),
+            sorted_receiver(init);
+        {first,Str1} ->
+            io:format("message1:~s~n",[Str1]),
+            sorted_receiver(first);
+        stop ->
+            io:format("message:~w~n",[stop])
+    end.
