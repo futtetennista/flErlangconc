@@ -1,4 +1,4 @@
-# Functional Programming in Erlang mooc
+# Concurrent Programming in Erlang mooc
 Exercises and assigments done during the [Concurrent Programming in Erlang mooc](https://www.futurelearn.com/courses/concurrent-programming-erlang).
 
 # Getting started
