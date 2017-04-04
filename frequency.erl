@@ -22,19 +22,49 @@ get_frequencies() -> [10,11,12,13,14,15].
 
 %% The Main Loop
 
+%% loop_test() ->
+    %% [
+    %%  ?assertEqual()
+    %% ].
+
+
 loop(Frequencies) ->
   receive
-    {request, Pid, allocate} ->
-      {NewFrequencies, Reply} = allocate(Frequencies, Pid),
-      Pid ! {reply, Reply},
-      loop(NewFrequencies);
-    {request, Pid , {deallocate, Freq}} ->
-      {NewFrequencies,Reply} = deallocate(Frequencies,Pid,Freq),
-      Pid ! {reply,Reply},
-      loop(NewFrequencies);
-    {request, Pid, stop} ->
-      Pid ! {reply, stopped}
+      {request,Pid,Req,timeout_ms} ->
+          case request_timed_out(timeout_ms) of
+              false ->
+                  NewFrequencies=process_request(Frequencies,{request,Pid,Req}),
+                  loop(NewFrequencies);
+              true ->
+                  loop(Frequencies)
+          end;
+      {request, Pid, stop} ->
+          Pid ! {reply,self(),stopped}
+  after 500 ->
+          clear(),
+          loop(Frequencies)
   end.
+
+request_timed_out(timeout_ms) ->
+    erlang:system_time(millis) >= timeout_ms.
+
+process_request(Frequencies,{request,Pid,allocate}) ->
+    {NewFrequencies, Reply} = allocate(Frequencies, Pid),
+    Pid ! {reply,self(),Reply},
+    NewFrequencies;
+process_request(Frequencies,{request,Pid,{deallocate, Freq}}) ->
+    {NewFrequencies,Reply} = deallocate(Frequencies,Pid,Freq),
+    Pid ! {reply,self(),Reply},
+    NewFrequencies.
+
+clear() ->
+    receive
+        Msg ->
+            io:format("Clearing msg: ~s~n",[Msg]),
+            clear()
+    after 0 ->
+            clear_ok
+    end.
 
 %% The Internal Help Functions used to allocate and
 %% deallocate frequencies.
@@ -89,7 +119,7 @@ stop() ->
     unregister(frequency).
 
 allocate(Pid) ->
-    frequency ! {request,Pid,allocate}.
+    frequency ! {request,Pid,allocate,{timeout,erlang:system_time(millis)+500}}.
 
 deallocate(Pid,Freq) ->
-    frequency ! {request,Pid,{deallocate,Freq}}.
+    frequency ! {request,Pid,{deallocate,Freq},{timeout,erlang:system_time(millis)+500}}.
