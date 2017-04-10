@@ -5,6 +5,18 @@ Exercises and assigments done during the [Concurrent Programming in Erlang mooc]
 ## Install erlang
 The easiest thing is to install Docker, download the erlang image using `docker pull erlang` and create an image using `docker run -it -v=$(pwd):/code -w=/code erlang`. This will create a new container that will run the erlang repl by default.
 
+### Using the observer with Docker
+- Make sure the version of the docker image of erlang is >= 19.2
+- Install XQuartz if not already installed: `brew install xquartz`
+- Run XQuartz
+- Update preferences 'Security' tab - turn on 'Allow connection from network clients'
+- Restart XQuartz and then check to see that it is listening on port 6000: `lsof -i :6000`
+- Get your local machine's IP: `ip=$(ipconfig getifaddr en0) && echo "My IP is" + $ip`
+- In the XQuartz terminal run: `xhost + xxx.xxx.xxx.xxx`. The output should be something like: `xxx.xxx.xxx.xxx being added to access control list`
+- Run the docker container: `docker run -it --rm -v=$(pwd):/code -w=/code --entrypoint=/bin/sh -e DISPLAY=${ip}:0 -v /tmp/.X11-unix:/tmp/.X11-unix erlang`
+
+Steps as described [here](https://forums.docker.com/t/x11-forwarding-issues-with-release-10/11252/4).
+
 ## REPL tricks
 - compile a file: `c(erlang_file).`
 - compile a file and export all functions (really handy for testing): `c(erlang_file,[export_all]).`
