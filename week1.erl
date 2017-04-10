@@ -109,5 +109,7 @@ sorted_receiver(State) ->
             io:format("message1:~s~n",[Str1]),
             sorted_receiver(first);
         stop ->
-            io:format("message:~w~n",[stop])
+            io:format("message:~w~n",[stop]);
+        _ ->
+            sorted_receiver(State) %% consume the msg and loop
     end.

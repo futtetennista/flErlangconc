@@ -10,6 +10,10 @@ The easiest thing is to install Docker, download the erlang image using `docker 
 - compile a file and export all functions (really handy for testing): `c(erlang_file,[export_all]).`
 - clear bindings: `f(Foobar).` or `f().` (the latter clears all bindings)
 
+## Links
+- https://medium.com/erlang-battleground/running-out-of-ammo-769bb28baac2
+
+
 ## Licence
 
 ```
