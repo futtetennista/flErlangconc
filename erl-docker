@@ -1,0 +1,2 @@
+#! /usr/bin/env sh
+docker run -it --rm -v=/Users/futtetennista/Developer/fl_erlang_conc:/code -w=/code --entrypoint=/bin/sh -v=/tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$(ipconfig getifaddr en0):0 erlang:19
