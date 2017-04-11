@@ -8,7 +8,7 @@
 
 -module(frequency).
 -export([start/0,allocate/0,deallocate/1,stop/0]).
--export([init/0]).
+-export([init/1]).
 
 %% These are the start functions used to create and
 %% initialize the server.
@@ -18,21 +18,25 @@ start() ->
     register(?MODULE,Pid),
     Pid.
 
-init() ->
+init(IntialFrequencies) ->
     register(?MODULE,self()),
-    process_flag(trap_exit, true),    %%% ADDED
-    Frequencies = {get_frequencies(), []},
+    process_flag(trap_exit, true),
+    Frequencies=get_frequencies(IntialFrequencies),
     io:format("[~w] Frequency server running~n",[self()]),
     loop(Frequencies).
 
 % Hard Coded
-get_frequencies() -> [10,11,12,13,14,15].
+get_frequencies(empty) ->
+    {[10,11,12,13,14,15],[]};
+get_frequencies(Frequencies) ->
+    Frequencies.
 
 %% The Main Loop
 
 loop(Frequencies) ->
+    frequency_supervisor ! {state,Frequencies},
     receive
-        {request, Pid, allocate} ->
+        {request,Pid,allocate} ->
             {NewFrequencies,Reply}=allocate(Frequencies, Pid),
             Pid ! {reply, Reply},
             loop(NewFrequencies);
@@ -45,10 +49,10 @@ loop(Frequencies) ->
                     Pid ! {reply,ok},
                     loop(NewFrequencies)
                 end;
-        {request,Pid,{restore,Freq}} ->
-            {NewFrequencies,Reply}=restore(Frequencies,Pid,Freq),
-            Pid ! {reply,Reply},
-            loop(NewFrequencies);
+        %% {request,Pid,{restore,Freq}} ->
+        %%     {NewFrequencies,Reply}=restore(Frequencies,Pid,Freq),
+        %%     Pid ! {reply,Reply},
+        %%     loop(NewFrequencies);
         {'EXIT', Pid, _Reason} ->
             io:format("~w exited~n",[Pid]),
             NewFrequencies=exited(Frequencies,Pid),
@@ -89,18 +93,6 @@ allocate({[],Allocated},_Pid) ->
 allocate({[Freq|Free],Allocated},Pid) ->
     MonitorRef=monitor(process,Pid),
     {{Free, [{Freq,Pid,MonitorRef}|Allocated]}, {ok, Freq}}.
-
-restore(Freqs={[],_Allocated},_Pid,_Freq) ->
-    {Freqs,{error,no_frequency}};
-restore(Freqs={Free,Allocated},Pid,Freq) ->
-    case lists:keysearch(Freq,1,Allocated) of
-        false ->
-            MonitorRef=monitor(process,Pid),
-            NewFree=lists:filter(fun(X) -> X /= Freq end,Free),
-            {{NewFree,[{Freq,Pid,MonitorRef}|Allocated]},{ok,Freq}};
-        _ ->
-            allocate(Freqs,Pid) %% Freq taken, assign a new one
-    end.
 
 deallocate({Free, Allocated}, Freq) ->
     case lists:keysearch(Freq,1,Allocated) of

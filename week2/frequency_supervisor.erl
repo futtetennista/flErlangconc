@@ -2,31 +2,36 @@
 -export([start/0,init/0,stop/0]).
 
 start() ->
-    register(?MODULE,spawn(frequency_supervisor,init,[])).
+    register(?MODULE,spawn(?MODULE,init,[])).
 
 init() ->
     process_flag(trap_exit,true),
-    ServerPid=start_frequency_server(),
-    supervise(ServerPid).
+    InitialState=empty,
+    ServerPid=start_frequency_server(InitialState),
+    supervise(ServerPid,InitialState).
 
-start_frequency_server() ->
-    spawn_link(frequency,init,[]).
+start_frequency_server(State) ->
+    spawn_link(frequency,init,[State]).
 
-supervise(ServerPid) ->
+supervise(ServerPid,State) ->
     receive
+        {state,NewState} ->
+            supervise(ServerPid,NewState);
         stop ->
             ok;
         {'EXIT',Pid,_Reason} when Pid == ServerPid ->
             io:format("Restarting frequency server~n"),
-            NewServerPid=start_frequency_server(),
-            supervise(NewServerPid);
-        {'EXIT',Pid,normal} when Pid == self() ->
+            NewServerPid=start_frequency_server(State),
+            supervise(NewServerPid,State);
+        {'EXIT',Pid,normale} when Pid == self() ->
+            io:format("Bye"),
             ok;
-        {'EXIT',Pid,Reason} ->
+        {'EXIT',_Pid,Reason} ->
             io:format("Illegal exit reason: ~w~n",[Reason]),
-            supervise(ServerPid)
+            supervise(ServerPid,State)
     end.
 
 stop() ->
-    %% Why is this not working => exit(self(),normal).
+    %% Why is this not working ?!
+    %% exit(self(),normal).
     ?MODULE ! stop.

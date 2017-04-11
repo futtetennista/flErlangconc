@@ -18,16 +18,11 @@ loop(Msg,Params) ->
     io:format("[~w] Sending req {~w}~n",[self(),Msg]),
     frequency ! {request,self(),Msg},
     receive
-        {reply,{ko,frequency_not_allocated}} ->
-            {_,Freq}=Msg,
-            loop({restore,Freq},Params);
         {reply,{ok,Freq}} ->
             io:format("[~w] Freq ~w allocated~n",[self(),Freq]),
-            %% timer:sleep(1000),
             loop({deallocate,Freq},Params);
         {reply,ok} ->
             io:format("[~w] Freq deallocated~n",[self()]),
-            %% timer:sleep(1000),
             loop(allocate,Params)
     after 10000 ->
             loop(Msg,Params)
